@@ -6,6 +6,8 @@ If you want to learn more about Quarkus, please visit its website: https://quark
 
 ## Running the the backend
 
+Based on https://quarkus.io/guides/neo4j
+
 ```shell script
 cd backend
 ```
