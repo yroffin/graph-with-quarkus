@@ -1,8 +1,12 @@
 package org.devops.graph.controller;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 
@@ -13,6 +17,8 @@ import javax.ws.rs.core.Response.Status;
 import org.devops.graph.model.NodeInterface;
 import org.jboss.logging.Logger;
 import org.neo4j.driver.Driver;
+import org.neo4j.driver.Result;
+import org.neo4j.driver.Session;
 import org.neo4j.driver.Values;
 import org.neo4j.driver.async.AsyncSession;
 import org.neo4j.driver.exceptions.NoSuchRecordException;
@@ -36,25 +42,73 @@ public class ServiceControllerAbstract<T extends NodeInterface> {
                 .thenApply(ResponseBuilder::build);
     }
 
+    public List<Long> findAny(Driver driver, T instance) {
+        try (Session session = driver.session()) {
+            return session.readTransaction(tx -> {
+                List<Long> names = new ArrayList<>();
+                Result result = tx.run("MATCH (a:" + instance.getClass().getSimpleName() + ") WHERE a.path = '"
+                        + instance.getPath() + "' AND a.version = '" + instance.getVersion() + "' RETURN id(a)");
+                while (result.hasNext()) {
+                    names.add(result.next().get(0).asLong());
+                }
+                return names;
+            });
+        }
+    }
+
     public CompletionStage<Response> create(Driver driver, T instance) {
+        // Check for same entity with path and version
+        var any = this.findAny(driver, instance);
+        if (any.size() > 0) {
+            return CompletableFuture.supplyAsync(() -> {
+                Status status = Status.BAD_REQUEST;
+                return Response.status(status).entity(new HashMap<String, String>() {
+                    private static final long serialVersionUID = 1L;
+                    {
+                        put("error", "XXX");
+                        put("message", "Node already exist with this path and this version");
+                    }
+                }).build();
+            });
+        }
         AsyncSession session = driver.asyncSession();
         Map<String, Object> fields = instance.asMap();
-        StringBuffer sb = new StringBuffer();
-        for (Entry<String, Object> field : fields.entrySet()) {
-            if (sb.length() == 0) {
-                sb.append(field.getKey() + ": $" + field.getKey());
-            } else {
-                sb.append(", " + field.getKey() + ": $" + field.getKey());
+        // a node must contains path and version
+        if (fields.containsKey("path") && fields.get("path") != null
+                && fields.get("path").toString().matches("([a-zA-Z0-9/\056//\057/]+)+") && fields.containsKey("version")
+                && fields.get("version") != null
+                && fields.get("version").toString().matches("([a-zA-Z0-9/\056//\057/]+)+")) {
+            StringBuffer sb = new StringBuffer();
+            for (Entry<String, Object> field : fields.entrySet()) {
+                if (sb.length() == 0) {
+                    sb.append(field.getKey() + ": $" + field.getKey());
+                } else {
+                    sb.append(", " + field.getKey() + ": $" + field.getKey());
+                }
             }
+            // Store query to log it aned use it further
+            String query = "CREATE (f:" + instance.getClass().getSimpleName() + " {" + sb.toString() + "}) RETURN f";
+            LOG.infof("" + query + " with " + fields);
+            return session
+                    .writeTransactionAsync(
+                            tx -> tx.runAsync(query, Values.value(fields)).thenCompose(fn -> fn.singleAsync()))
+                    .thenApply(record -> instance.asNode(record.get("f").asNode()))
+                    .thenCompose(persisted -> session.closeAsync().thenApply(signal -> persisted))
+                    .thenApply(persisted -> Response.created(URI.create("/services/" + persisted.getInternalId()))
+                            .build());
+        } else {
+            return CompletableFuture.supplyAsync(() -> {
+                Status status = Status.BAD_REQUEST;
+                return Response.status(status).entity(new HashMap<String, String>() {
+                    private static final long serialVersionUID = 1L;
+                    {
+                        put("error", "XXX");
+                        put("message",
+                                "A node must contain a path and a version and match alphanumeric (plus . and /)");
+                    }
+                }).build();
+            });
         }
-        String query = "CREATE (f:" + instance.getClass().getSimpleName() + " {" + sb.toString() + "}) RETURN f";
-        LOG.infof("" + query + " with " + fields);
-        return session
-                .writeTransactionAsync(
-                        tx -> tx.runAsync(query, Values.value(fields)).thenCompose(fn -> fn.singleAsync()))
-                .thenApply(record -> instance.asNode(record.get("f").asNode()))
-                .thenCompose(persisted -> session.closeAsync().thenApply(signal -> persisted))
-                .thenApply(persisted -> Response.created(URI.create("/services/" + persisted.getInternalId())).build());
     }
 
     public CompletionStage<Response> getSingle(Driver driver, ITFactory<T> factory, long id) {
@@ -82,8 +136,9 @@ public class ServiceControllerAbstract<T extends NodeInterface> {
                 }).thenCompose(response -> session.closeAsync().thenApply(signal -> response));
     }
 
-    public CompletionStage<Response> delete(Driver driver, T instance, long id) {
+    public CompletionStage<Response> delete(Driver driver, ITFactory<T> factory, long id) {
         AsyncSession session = driver.asyncSession();
+        T instance = factory.create();
         String query = "MATCH (f:" + instance.getClass().getSimpleName() + ") WHERE id(f) = $id DELETE f";
         LOG.infof("" + query + " with " + id);
         return session

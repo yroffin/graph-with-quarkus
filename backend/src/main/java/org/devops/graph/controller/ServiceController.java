@@ -42,6 +42,6 @@ public class ServiceController extends ServiceControllerAbstract<Service> {
     @DELETE
     @Path("{id}")
     public CompletionStage<Response> delete(@PathParam("id") long id) {
-        return this.delete(driver, new Service(), id);
+        return this.delete(driver, () -> new Service(), id);
     }
 }

@@ -1,6 +1,6 @@
 quarkus:
-  quarkus:
-    smallrye-openapi.path: /swagger
+  smallrye-openapi:
+    path: /swagger
   http:
     host: 0.0.0.0
   neo4j:
