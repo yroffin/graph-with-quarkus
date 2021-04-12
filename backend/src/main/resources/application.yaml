@@ -8,3 +8,7 @@ quarkus:
     authentication:
       username: neo4j
       password: secret
+  log:
+    category:
+      "org.jboss.resteasy":
+        level: TRACE

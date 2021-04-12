@@ -1,4 +1,4 @@
-package org.devops.graph.controller;
+package org.devops.graph.controller.abs;
 
 import java.net.URI;
 import java.util.HashMap;
@@ -17,16 +17,16 @@ import org.neo4j.driver.Values;
 import org.neo4j.driver.async.AsyncSession;
 import org.neo4j.driver.exceptions.NoSuchRecordException;
 
-public class RelationshipControllerAbstract<T extends RelationshipInterface> {
+public class RelationshipControllerAbstract<R extends RelationshipInterface> {
 
     @FunctionalInterface
-    interface ITFactory<T> {
+    public interface ITFactory<T> {
         T create();
     }
 
     private static final Logger LOG = Logger.getLogger(RelationshipControllerAbstract.class);
 
-    public CompletionStage<Response> create(final Driver driver, final T instance) {
+    public CompletionStage<Response> create(final Driver driver, final R instance) {
         final AsyncSession session = driver.asyncSession();
         // an edge must contains from and to
         if (instance.from() != null && instance.from().getPath() != null && instance.from().getVersion() != null

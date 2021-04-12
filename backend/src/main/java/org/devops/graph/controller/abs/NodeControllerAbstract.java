@@ -1,4 +1,4 @@
-package org.devops.graph.controller;
+package org.devops.graph.controller.abs;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -23,14 +23,14 @@ import org.neo4j.driver.Values;
 import org.neo4j.driver.async.AsyncSession;
 import org.neo4j.driver.exceptions.NoSuchRecordException;
 
-public class ServiceControllerAbstract<T extends NodeInterface> {
+public class NodeControllerAbstract<T extends NodeInterface> {
 
     @FunctionalInterface
-    interface ITFactory<T> {
+    public interface ITFactory<T> {
         T create();
     }
 
-    private static final Logger LOG = Logger.getLogger(ServiceControllerAbstract.class);
+    private static final Logger LOG = Logger.getLogger(NodeControllerAbstract.class);
 
     public CompletionStage<Response> get(Driver driver, ITFactory<T> factory) {
         AsyncSession session = driver.asyncSession();
