@@ -13,13 +13,14 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import org.devops.graph.controller.abs.NodeControllerAbstract;
 import org.devops.graph.model.Service;
 import org.neo4j.driver.Driver;
 
 @Path("/v1/graph/services")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
-public class ServiceController extends ServiceControllerAbstract<Service> {
+public class ServiceController extends NodeControllerAbstract<Service> {
     @Inject
     Driver driver;
 
@@ -42,6 +43,6 @@ public class ServiceController extends ServiceControllerAbstract<Service> {
     @DELETE
     @Path("{id}")
     public CompletionStage<Response> delete(@PathParam("id") long id) {
-        return this.delete(driver, new Service(), id);
+        return this.delete(driver, () -> new Service(), id);
     }
 }

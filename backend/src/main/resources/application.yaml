@@ -1,6 +1,6 @@
 quarkus:
-  quarkus:
-    smallrye-openapi.path: /swagger
+  smallrye-openapi:
+    path: /swagger
   http:
     host: 0.0.0.0
   neo4j:
@@ -8,3 +8,7 @@ quarkus:
     authentication:
       username: neo4j
       password: secret
+  log:
+    category:
+      "org.jboss.resteasy":
+        level: TRACE
